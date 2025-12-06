@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -44,6 +45,8 @@ func main() {
 	router.Use(middlewarelogger.New(logger))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+
+	router.Handle("/metrics", promhttp.Handler())
 
 	router.Get("/{alias}", redirect.New(logger, storage))
 	router.Post("/", save.New(logger, storage))
