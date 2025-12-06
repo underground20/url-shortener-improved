@@ -3,15 +3,43 @@ services:
         build:
             context: .
             dockerfile: ./build/Dockerfile
+        env_file:
+            - .env
         ports:
             - "8082:8082"
-        environment:
-            - CONFIG_PATH=./config/local.yaml
-        volumes:
-            - ./storage:/app/storage
         restart: unless-stopped
+        depends_on:
+            - migrator
         healthcheck:
             test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:8082/health"]
             interval: 10s
             timeout: 5s
             retries: 3
+    migrator:
+        image: migrate/migrate:v4.15.0
+        depends_on:
+            - postgres
+        volumes:
+            - ./migrations:/migrations
+        env_file:
+            - .env
+        command: [
+            "-path=/migrations",
+            "-database=${DATABASE_URL}",
+            "up"
+        ]
+    postgres:
+        image: postgres:16-alpine
+        environment:
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DB: ${DB_NAME}
+        env_file:
+            - .env
+        ports:
+            - "54321:5432"
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5

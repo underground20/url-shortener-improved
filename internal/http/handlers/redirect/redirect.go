@@ -36,7 +36,6 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 
 		resURL, err := urlGetter.GetURL(alias)
 		if errors.Is(err, storage.ErrUrlNotFound) {
-			// Не нашли URL, сообщаем об этом клиенту
 			log.Info("url not found", "alias", alias)
 
 			render.JSON(w, r, response.Error("not found"))
@@ -53,7 +52,6 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 
 		log.Info("got url", slog.String("url", resURL))
 
-		// Делаем редирект на найденный URL
 		http.Redirect(w, r, resURL, http.StatusFound)
 	}
 }

@@ -12,9 +12,7 @@ FROM deps AS builder
 
 RUN apk --no-cache add \
     gcc \
-    g++ \
-    sqlite-dev \
-    musl-dev
+    g++
 
 COPY . .
 
@@ -22,14 +20,8 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o ./server ./cmd/url-shortener
 
 FROM alpine:3.22
 
-RUN apk --no-cache add \
-    sqlite
-
 WORKDIR /app
 
 COPY --from=builder /app/server /app/server
-COPY --from=builder /app/config /app/config
-
-RUN mkdir -p /app/storage
 
 CMD ["/app/server"]

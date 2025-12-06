@@ -11,16 +11,15 @@ import (
 	"url-shortener/internal/http/handlers/redirect"
 	"url-shortener/internal/http/handlers/url/save"
 	middlewarelogger "url-shortener/internal/http/middleware/logger"
-	"url-shortener/internal/storage/sqlite"
+	"url-shortener/internal/storage/postgres"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
-	envLocal = "local"
-	envDev   = "dev"
-	envProd  = "prod"
+	envDev  = "dev"
+	envProd = "prod"
 )
 
 func main() {
@@ -28,9 +27,12 @@ func main() {
 	logger := setupLogger(cfg.Env)
 	logger = logger.With(slog.String("env", cfg.Env))
 
-	logger.Info("Initialize server", slog.String("address", cfg.Address))
+	logger.Info("Initialize server", slog.String("address", cfg.HttpServer.Address))
 
-	storage, err := sqlite.NewStorage(cfg.StoragePath)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.HttpServer.Timeout)
+	defer cancel()
+
+	storage, err := postgres.NewStorage(cfg.DatabaseURL, ctx)
 	if err != nil {
 		logger.Error("failed to create storage", err)
 		os.Exit(1)
@@ -50,7 +52,7 @@ func main() {
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	srv := &http.Server{
-		Addr:         cfg.Address,
+		Addr:         cfg.HttpServer.Address,
 		Handler:      router,
 		ReadTimeout:  cfg.HttpServer.Timeout,
 		WriteTimeout: cfg.HttpServer.Timeout,
@@ -68,9 +70,6 @@ func main() {
 	<-done
 	logger.Info("stopping server")
 
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.HttpServer.Timeout)
-	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("failed to stop server")
 		return
@@ -81,8 +80,6 @@ func main() {
 
 func setupLogger(env string) *slog.Logger {
 	switch env {
-	case envLocal:
-		return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	case envDev:
 		return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	case envProd:
